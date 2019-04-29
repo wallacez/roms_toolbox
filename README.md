@@ -1,2 +1,2 @@
 # roms_toolbox
-Scripts for pre- and post-processing of ROMS data
+MATLAB and Python scripts for pre- and post-processing of ROMS data.
