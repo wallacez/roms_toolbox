@@ -3,6 +3,7 @@
 #
 # Author Z. Wallace
 # Created: 4.15.19
+# Last edit: 4.30.19 --> Allow cmd-line specification of variable to plot
 
 #from argparse import ArgumentParser
 from sys import argv
@@ -14,9 +15,18 @@ from numpy import log10, zeros
 
 from matplotlib.pyplot import pcolormesh, show, title, colorbar, tight_layout
 
-def generate_data(month_string, start_year, num_years):
+def generate_data(month_string, start_year, num_years, map_var):
     # Acquire list of file names.
-    path_to_dir = "/Users/zach/Documents/Patagonia_Iron/data/NASA/chlorophyll/SeaWiFS/yearly/mapped"
+    f1 = "/Users/zach/Documents/Patagonia_Iron/data/NASA"
+    if map_var == "temp":
+        f2 = "temperature/Aqua"
+        varname = "chlor_a"
+    elif map_var == "chl":
+        f2 = "chlorophyll/SeaWiFS"
+        varname = "temp"
+    f3 = "yearly/mapped"
+    path_to_dir = "/".join([f1, f2, f3])
+    
     proc_result = run(["ls", path_to_dir], capture_output=True)
     file_names = proc_result.stdout.splitlines()
     
@@ -39,36 +49,35 @@ def generate_data(month_string, start_year, num_years):
     lon = var_list["lon"][:]
     lat = var_list["lat"][:]
 
-    chla_records = zeros((len(lat), len(lon), num_years))
+    var_records = zeros((len(lat), len(lon), num_years))
     
     # Acquire desired number of chlorophyll time records for month of
     # interest and take the average.
     for record in range(len(filtered_list)):
-        chla_records[:,:,record] = Dataset(filtered_list[record]).variables['chlor_a'][:]
+        var_records[:,:,record] = Dataset(filtered_list[record]).variables[varname][:]
 
     # Save data in a dictionary rather than returning and passing multiple arguments.
-    chla_avg = {
+    vardata = {
         "lon" : lon,
         "lat" : lat,
-        "chla" : chla_records
+        "records" : var_records
     }
 
-    return chla_avg
+    return vardata
 
 
-def plot_data(av_chla, start_year, num_years, month_string):
-    pcolormesh(av_chla["lon"],
-               av_chla["lat"], 
-               log10(mmean(av_chla["chla"],axis=2)),
+def plot_data(vardata, start_year, num_years, month_string):
+    pcolormesh(vardata["lon"],
+               vardata["lat"], 
+               log10(mmean(vardata["records"],axis=2)),
                vmin=-1, vmax=0.7, cmap="jet", shading='gouraud')
     colorbar()
     if num_years != 1:
         title("SeaWiFS {} Chl-a | {} - {} Mean".format(month_string,
-                                                       start_year, 
-                                                       str(int(start_year)+num_years-1)))
+            start_year, str(int(start_year)+num_years-1)))
     else:
         title("SeaWiFS {} Chl-a | {}".format(month_string,
-                                             start_year))
+            start_year))
     tight_layout()
     show()
 
@@ -81,6 +90,7 @@ def main():
     month_string = argv[1]
     start_year = argv[2]
     num_years = int(argv[3])
+    var_to_map = argv[4]
 
     month_dict = { 
         "Jan" : "01",
@@ -100,7 +110,8 @@ def main():
     month_suffix = "_".join(["",month_dict[month_string]])
     
     # Generate data from appropriate files
-    data_to_plot = generate_data(month_suffix, start_year, num_years)
+    data_to_plot = generate_data(month_suffix, start_year, num_years,
+        var_to_map)
 
     # Plot data
     plot_data(data_to_plot, start_year, num_years, month_string)
